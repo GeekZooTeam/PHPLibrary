@@ -1,0 +1,8 @@
+{
+    "require": {
+        "xuanyan/database": "dev-master",
+        "xuanyan/router": "dev-master",
+        "smarty/smarty": "dev-trunk",
+        "minmb/phpmailer": "dev-master"
+    }
+}

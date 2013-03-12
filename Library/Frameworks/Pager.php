@@ -9,6 +9,9 @@
  *
  */
 
+ //$url = 'http://lulalulalei.com:8080/admin';
+ //print_r(parse_url($url));exit;
+
 class Pager
 {
     private $total =  0;
@@ -169,5 +172,3 @@ class Pager
         return $this->per_page;
     }
 }
-
-?>

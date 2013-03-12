@@ -7,94 +7,164 @@
  * @license http://opensource.org/licenses/gpl-2.0.php The GNU General Public License
  * @author xuanyan <xuanyan@geek-zoo.com>
  *
- */
+*/
 
-Initialization::start();
+defined('ROOT_PATH') || define('ROOT_PATH', getcwd());
+define('LIB_PATH', dirname(__FILE__));
 
-final class Initialization
-{
-    private static $basedir = null;
-    private static $start_time = null;
+// if cant get date.timezone set the default timezone
+if (!ini_get('date.timezone')) {
+    date_default_timezone_set('Asia/Chongqing');
+}
 
-    public static function start()
-    {
-        self::$basedir = dirname(__FILE__);
-        self::$start_time = microtime(true);
-        // set default timezone
-        date_default_timezone_set('PRC');
-        // register the autoload function
-        spl_autoload_register(array(__CLASS__, '__autoload'));
-        // if magic_quotes_sybase is ON then do this:
-        if (get_magic_quotes_gpc()) {
-            $_GET    = self::stripslashes_recursive($_GET);
-            $_POST   = self::stripslashes_recursive($_POST);
-            $_COOKIE = self::stripslashes_recursive($_COOKIE);
-        }
+$loader = include_once LIB_PATH . '/vendor/autoload.php';
+
+$classMap = array();
+foreach (glob(LIB_PATH . "/Frameworks/*.php") as $value) {
+    $class = basename($value, '.php');
+    $classMap[$class] = $value;
+}
+$loader->addClassMap($classMap);
+
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    $lines = file($errfile);
+    $code = $lines[$errline-1];
+
+    if (strpos($code, '@') !== false) {
+        return false;
     }
 
-    public static function getRuntime()
-    {
-        return microtime(true) - self::$start_time;
-    }
+    throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
+});
 
-    private static function __autoload($classname)
-    {
-        switch  ($classname) {
-            case 'Database':
-                require_once self::$basedir.'/3rd/SuperNuts/'.$classname.'.php';
-                break;
-            case 'Smarty':
-                require_once self::$basedir.'/3rd/Smarty3/Smarty.class.php';
-                break;
-            case 'getid3':
-                require_once self::$basedir . '/3rd/getid3/getid3.php';
-                break;
-            case 'PHPMailer':
-                require_once self::$basedir . '/3rd/PHPMailer/class.phpmailer.php';
-                break;
-            default:
-                $file = self::$basedir.'/'.$classname.'.php';
-                if (file_exists($file)) {
-                    require_once $file;
-                }
-        }
-    }
 
-    private static function stripslashes_recursive($array)
-    {
-        $array = is_array($array) ? array_map(array(__CLASS__, 'stripslashes_recursive'), $array) : stripslashes($array);
+if (PHP_SAPI != 'cli') {
 
-        return $array;
-    }
-
-    public static function getMacAdress()
-    {
-        $return_array = array();
-        if (DIRECTORY_SEPARATOR == '/') { // linux
-            @exec("ifconfig -a", $return_array);
+    if (!defined('HTTPS')) {
+        if (isset($_SERVER['HTTPS']) && !strcasecmp($_SERVER['HTTPS'], 'on')) {
+            define('HTTPS', 1);
         } else {
-            @exec("ipconfig /all", $return_array);
-
-            if (!$return_array) {
-                $ipconfig = $_SERVER["WINDIR"]."\system32\ipconfig.exe";
-                if (file_exists($ipconfig)) {
-                    @exec($ipconfig." /all", $return_array);
-                } else {
-                    @exec($_SERVER["WINDIR"]."\system\ipconfig.exe /all", $return_array);
-                }
-            }
+            define('HTTPS', 0);
         }
-
-        foreach ($return_array as $key => $val) {
-            if (preg_match('/(?:\w{2}[:-]){5}\w{2}/', $val, $match)) {
-                $return_array[$key] = $match[0];
-            } else {
-                unset($return_array[$key]);
-            }
-        }
-
-        return array_values($return_array);
     }
+
+    if (!isset($_SERVER['HTTP_HOST'])) {
+        $_SERVER['HTTP_HOST'] = $_SERVER['SERVER_NAME'];
+    }
+
+    if (strpos($_SERVER['HTTP_HOST'], ':')) {
+        $_SERVER['HTTP_HOST'] = strtok($_SERVER['HTTP_HOST'], ':');
+    }
+
+    // auto check subdir
+    $subDir = '';
+    if (isset($_SERVER['PHP_SELF']) && strpos($_SERVER['PHP_SELF'], 'index.php')) {
+        $subDir = dirname($_SERVER['PHP_SELF']);
+    } elseif (isset($_SERVER['DOCUMENT_ROOT']) && strpos($_SERVER['SCRIPT_FILENAME'], $_SERVER['DOCUMENT_ROOT']) === 0) {
+        $subDir = dirname(substr($_SERVER['SCRIPT_FILENAME'], strlen($_SERVER['DOCUMENT_ROOT'])));
+    }
+    $subDir = rtrim($subDir, '/');
+
+    if (!defined('SITE_URL')) {
+        $site_url = HTTPS ? 'https://' : 'http://';
+        $site_url .= $_SERVER['HTTP_HOST'];
+
+        // echo $site_url;exit;
+        if (isset($_SERVER['SERVER_PORT'])) {
+            if ((HTTPS && $_SERVER['SERVER_PORT'] != 443) || ($_SERVER['SERVER_PORT'] != 80)) {
+                $site_url .= ':' . $_SERVER['SERVER_PORT'];
+            }
+        }
+        $subDir && $site_url .= $subDir;
+
+        define('SITE_URL', $site_url);
+    }
+    
+    // fix SCRIPT_URL
+    if (empty($_SERVER['SCRIPT_URL'])) {
+        if (!empty($_SERVER['REDIRECT_URL'])) {
+            $_SERVER['SCRIPT_URL'] = substr($_SERVER['REDIRECT_URL'], strlen($subDir)+1);
+        } elseif (!empty($_SERVER['REQUEST_URI'])) {
+            $p = parse_url($_SERVER['REQUEST_URI']);
+            $_SERVER['SCRIPT_URL'] = substr($p['path'], strlen($subDir)+1);
+        }
+    }
+
+    // it seems as 'php bug in fast-cgi no $_GET'
+    // if (strpos($_SERVER['REQUEST_URI'], '?') !== false && empty($_GET)) {
+    //     $p = parse_url($_SERVER['REQUEST_URI']);
+    //     parse_str($p['query'], $_GET);
+    // }
+
+    // if magic_quotes_sybase is ON then do this:
+    if (get_magic_quotes_gpc()) {
+        $_GET    = stripslashes_recursive($_GET);
+        $_POST   = stripslashes_recursive($_POST);
+        $_COOKIE = stripslashes_recursive($_COOKIE);
+    }
+}
+
+return $loader;
+
+function getMacAdress() {
+    $return_array = array();
+    if (DIRECTORY_SEPARATOR == '/') { // linux
+        @exec("ifconfig -a", $return_array);
+    } else {
+        @exec("ipconfig /all", $return_array);
+
+        if (!$return_array) {
+            $ipconfig = $_SERVER["WINDIR"]."\system32\ipconfig.exe";
+            if (file_exists($ipconfig)) {
+                @exec($ipconfig." /all", $return_array);
+            } else {
+                @exec($_SERVER["WINDIR"]."\system\ipconfig.exe /all", $return_array);
+            }
+        }
+    }
+
+    foreach ($return_array as $key => $val) {
+        if (preg_match('/(?:\w{2}[:-]){5}\w{2}/', $val, $match)) {
+            $return_array[$key] = $match[0];
+        } else {
+            unset($return_array[$key]);
+        }
+    }
+
+    return array_values($return_array);
+}
+
+function stripslashes_recursive($array) {
+    $array = is_array($array) ? array_map(__FUNCTION__, $array) : stripslashes($array);
+
+    return $array;
+}
+
+/**
+ * 递归合并数组，并对没有下标的数组进行替换而不是相加操作（区别于array_merge_recursive）
+ * @param array $a 原数组
+ * @param array $b 追加，替换数组
+ * @return array 合并后的数组
+ * @author xuanyan
+ */
+function mergeRecursive($a, $b)
+{
+    foreach ($b as $key => $value) {
+        // 没有key替换
+        if (!isset($a[$key])) {
+            $a[$key] = $value;
+            continue;
+        }
+        // 原数组当前key不是数组，或者需替换数组当前值不是数组
+        if (!is_array($value) || !is_array($a[$key])) {
+            $a[$key] = $value;
+            continue;
+        }
+        // 原数组和替换数组，当前都为数组，进行递归替换
+        $a[$key] = mergeRecursive($a[$key], $value);
+    }
+
+    return $a;
 }
 
 function getClienip() {
@@ -149,4 +219,48 @@ function _POST($key = '', $default = '') {
     return floatval($_POST[$key]);
 }
 
-?>
+function _ARGV($key = '', $default = '') {
+    if (empty($GLOBALS['argv']) || !is_array($GLOBALS['argv'])) {
+        $GLOBALS['argv'] = array();
+    }
+
+    $result = array();
+    $last_arg = null;
+    foreach ($GLOBALS['argv'] as $val) {
+        $pre = substr($val, 0, 2);
+        if ($pre == '--') {
+            $parts = explode("=", substr($val, 2), 2);
+            if (isset($parts[1])) {
+                $result[$parts[0]] = $parts[1];
+            } else {
+                $result[$parts[0]] = true;
+            }
+        } elseif ($pre{0} == '-') {
+            $string = substr($val, 1);
+            $len = strlen($string);
+            for ($i = 0; $i < $len; $i++) {
+                $key = $string[$i];
+                $result[$key] = true;
+            }
+            $last_arg = $key;
+        } elseif ($last_arg !== null) {
+            $result[$last_arg] = $val;
+            $last_arg = null;
+        }
+    }
+
+    if (empty($key)) {
+        return $result;
+    }
+    if (!isset($result[$key])) {
+        return $default;
+    }
+    if (is_string($default)) {
+        return trim($result[$key]);
+    }
+    if (is_int($default)) {
+        return intval($result[$key]);
+    }
+
+    return floatval($result[$key]);
+}
