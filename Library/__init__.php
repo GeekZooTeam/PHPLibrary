@@ -135,6 +135,18 @@ function stripslashes_recursive($array) {
 }
 
 /**
+ * modelclass::getInstance() 别名
+ *
+ * @param $model name
+ * @return Model Class
+ */
+function _model($model) {
+    $class= $model . 'Model';
+
+    return $class::getInstance();
+}
+
+/**
  * 递归合并数组，并对没有下标的数组进行替换而不是相加操作（区别于array_merge_recursive）
  * @param array $a 原数组
  * @param array $b 追加，替换数组

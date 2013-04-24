@@ -9,43 +9,10 @@
  *
  */
 
-// helper function
-function _model($name = null) {
-    static $models = array();
 
-    if (!isset($name)) {
-        $name = '__null__';
-    }
-
-    if (!isset($models[$name])) {
-        $file = Model::$dir."/$name.php";
-        $t = explode('/', $name);
-        $table_name = end($t);
-
-        if (file_exists($file)) {
-            require_once $file;
-            $class = $table_name.'_model';
-        } else {
-            $class = 'Model';
-        }
-        
-        $models[$name] = new $class(Database::$instance);
-        
-        if ($name !== '__null__') {
-            $models[$name]->table = Model::_t($table_name);
-        }
-    }
-
-    return $models[$name];
-}
-
-
-class Model implements ArrayAccess, Countable
+class Model extends Singleton
 {
     protected $db  = null;
-    public static $mc  = null;
-    public static $dir = './model';
-    public static $dbPrefix = array();
 
     public $table = '';
 
@@ -58,9 +25,18 @@ class Model implements ArrayAccess, Countable
         return 'WHERE '.implode(' AND ', $where);
     }
 
-    public function __construct($db)
+    public function __construct()
     {
-        $this->db = $db;
+        $dbConfig = Config::getInstance()->get('database');
+
+        $this->db = Database::connect($dbConfig['connection']);
+        $this->db->setConfig('initialization', $dbConfig['initialization']);
+        $this->db->setConfig('tablePreFix', $dbConfig['tablePreFix']);
+
+        if (empty($this->table)) {
+            $thisClass = get_class($this);
+            $this->table = '{{' . substr($thisClass, 0, -5) . '}}';
+        }
     }
 
     public function read($option)
@@ -113,32 +89,31 @@ class Model implements ArrayAccess, Countable
         return $this->db;
     }
 
-    public function update($option, $array = array())
+    public function update($option, $array)
     {
         $table = $this->table;
-
+            
         if ($table == '') {
             if (!is_string($option)) {
                 throw new Exception("no table name, param must be string");
             }
             return $this->db->exec($option);
         }
-
+            
         if (is_string($option)) {
             $sql = "UPDATE `$table` $option";
-
+            
             return $this->db->exec($sql);
         }
-    
+            
         $set = array();
         foreach ($array as $key => $val) {
             $set[] = "$key = ?";
         }
-
+            
         $param = array_merge(array_values($array), array_values($option));
-
+            
         $sql = "UPDATE `$table` SET ".implode(',', $set).' '.$this->getSql($option);
-        
         return $this->db->exec($sql, $param);
     }
 
@@ -263,52 +238,32 @@ class Model implements ArrayAccess, Countable
 
         return $this->db->getOne($sql);
     }
-
-    public static function _t($table_name)
+    
+    
+    public function getSum($column, $option = array())
     {
-        foreach (self::$dbPrefix as $key => $val) {
-            if ($val == '*') {
-                return $key.$table_name;
+        $table = $this->table;
+
+        if ($table == '') {
+            if (!is_string($option)) {
+                throw new Exception("no table name, param must be string");
             }
-            if (in_array($table_name, $val)) {
-                return $key.$table_name;
-            }
-        }
-        return $table_name;
-    }
-
-    // interface
-
-    public function count()
-    {
-        return $this->getCount();
-    }
-
-    public function offsetGet($key)
-    {
-        $result = $this->read(array('id'=>$key));
-
-        return $result;
-    }
-
-    public function offsetExists($key)
-    {
-        if ($result = $this->read(array('id'=>$key))) {
-            return true;
+            return $this->db->getOne($option);
         }
 
-        return false;
-    }
+        if (is_string($option)) {
+            $sql = "SELECT SUM($column) FROM `$table` $option";
 
-    public function offsetSet($key, $val)
-    {
-        return $this->update(array('id'=>$key), $val);
-    }
-    // delete
-    public function offsetUnset($key)
-    {
-        return $this->delete(array('id'=>$key));
+            return $this->db->getOne($sql);
+        }
+
+        if ($option) {
+            $sql = "SELECT SUM($column) FROM `$table` ".$this->getSql($option);
+
+            return $this->db->getOne($sql, array_values($option));
+        }
+        $sql = "SELECT SUM($column) FROM `$table`";
+
+        return $this->db->getOne($sql);
     }
 }
-
-?>

@@ -9,50 +9,21 @@
  *
  */
 
-class Config
+class Config extends Singleton
 {
     private static $array = array();
 
-    /**
-     * set a config value
-     *
-     * @param mix $key 
-     * @param mix $value 
-     * @param string $action 
-     * @return bool
-     */
-    public static function set($key, $value = '')
+    function __construct()
     {
-        if (!is_array($key)) {
-            $key = array($key => $value);
+        if (file_exists(ROOT_PATH.'/config.php')) {
+            self::$array = require_once ROOT_PATH.'/config.php';
         }
-
-        foreach ($key as $k => $v) {
-            self::$array[$k] = $v;
-        }
-
-        return true;
+        // todo 远程提取
     }
 
-    /**
-     * get a config value
-     *
-     * @param string $key
-     * @return mix
-     */
-    public static function get($key)
+    function get($key)
     {
-        if (func_num_args() > 1) {
-            $key = func_get_args();
-            $out = array();
-            foreach ($key as $key => $val) {
-                $out[] = @self::$array[$key];
-            }
-
-            return $out;
-        }
-
-        return @self::$array[$key];
+        return isset(self::$array[$key]) ? self::$array[$key] : null;
     }
 }
 
