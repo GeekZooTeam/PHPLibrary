@@ -17,25 +17,19 @@ if (!ini_get('date.timezone')) {
     date_default_timezone_set('Asia/Chongqing');
 }
 
-$loader = include_once LIB_PATH . '/vendor/autoload.php';
+if (version_compare(PHP_VERSION, '5.3.0', '<')) { // below 5.3
+    $loader = include_once LIB_PATH . '/autoload.php';
+} else {
+    $loader = include_once LIB_PATH . '/vendor/autoload.php';
+}
 
 $classMap = array();
 foreach (glob(LIB_PATH . "/Frameworks/*.php") as $value) {
     $class = basename($value, '.php');
     $classMap[$class] = $value;
 }
+
 $loader->addClassMap($classMap);
-
-set_error_handler(function($errno, $errstr, $errfile, $errline) {
-    $lines = file($errfile);
-    $code = $lines[$errline-1];
-
-    if (strpos($code, '@') !== false) {
-        return false;
-    }
-
-    throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
-});
 
 
 if (PHP_SAPI != 'cli') {
@@ -181,42 +175,63 @@ function getClienip() {
     return filter_var($onlineip, FILTER_VALIDATE_IP) !== false ? $onlineip : 'unknown';
 }
 
+function getValueByDefault($value, $default) {
+    if (!is_array($value)) {
+
+        $whiteList = array();
+        if (is_array($default)) {
+            $whiteList = $default;
+        }
+        $default = $default[0];
+
+        if (is_string($default)) {
+            $value = trim($value);
+        } elseif (is_int($default)) {
+            $value = intval($value);
+        } else {
+            $value = floatval($value);
+        }
+
+        if ($whiteList && !in_array($value, $whiteList)) {
+            $value = $default;
+        }
+
+    } else {
+        foreach ($value as $key => $val) {
+            isset($default[$key]) || $default[$key] = '';
+            $value[$key] = getValueByDefault($value[$key], $default[$key]);
+        }
+        $value = array_merge($value, array_diff_key($default, $value));
+    }
+
+    return $value;
+}
+
 function _GET($key = '', $default = '') {
     if (empty($key)) {
         return $_GET;
     }
+
     if (!isset($_GET[$key])) {
-        return $default;
+        $_GET[$key] = '';
     }
-    if (is_string($default)) {
-        return trim($_GET[$key]);
-    }
-    if (is_int($default)) {
-        return intval($_GET[$key]);
-    }
-    if (is_array($default)) {
-        return (array)$_GET[$key];
-    }
-    return floatval($_GET[$key]);
+    $value = getValueByDefault($_GET[$key], $default);
+
+    return $value;
 }
 
 function _POST($key = '', $default = '') {
     if (empty($key)) {
         return $_POST;
     }
+
     if (!isset($_POST[$key])) {
-        return $default;
+        $_POST[$key] = '';
     }
-    if (is_string($default)) {
-        return trim($_POST[$key]);
-    }
-    if (is_int($default)) {
-        return intval($_POST[$key]);
-    }
-    if (is_array($default)) {
-        return (array)$_POST[$key];
-    }
-    return floatval($_POST[$key]);
+
+    $value = getValueByDefault($_POST[$key], $default);
+
+    return $value;
 }
 
 function _ARGV($key = '', $default = '') {
@@ -252,15 +267,10 @@ function _ARGV($key = '', $default = '') {
     if (empty($key)) {
         return $result;
     }
+
     if (!isset($result[$key])) {
-        return $default;
-    }
-    if (is_string($default)) {
-        return trim($result[$key]);
-    }
-    if (is_int($default)) {
-        return intval($result[$key]);
+        $result[$key] = '';
     }
 
-    return floatval($result[$key]);
+    return getValueByDefault($result[$key], $default);
 }
