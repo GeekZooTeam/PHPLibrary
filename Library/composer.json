@@ -3,6 +3,7 @@
         "xuanyan/database": "dev-master",
         "xuanyan/router": "dev-master",
         "smarty/smarty": "dev-trunk",
-        "minmb/phpmailer": "dev-master"
+        "minmb/phpmailer": "dev-master",
+        "ezyang/htmlpurifier": "v4.5.0"
     }
 }
