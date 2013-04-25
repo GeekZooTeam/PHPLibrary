@@ -193,8 +193,8 @@ function getValueByDefault($value, $default) {
         $whiteList = array();
         if (is_array($default)) {
             $whiteList = $default;
+            $default = $default[0];
         }
-        $default = $default[0];
 
         if (is_string($default)) {
             $value = trim($value);

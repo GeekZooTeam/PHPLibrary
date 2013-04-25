@@ -29,7 +29,8 @@
  * @author Jordi Boggiano <j.boggiano@seld.be>
  */
 
-// fix ClassLoader run below php 5.3.0
+//@author xuanyan <xuanyan@geek-zoo.com> fix ClassLoader run below php 5.3.0
+
 $loader = new ClassLoader();
 
 $map = require LIB_PATH . '/vendor/composer/autoload_namespaces.php';

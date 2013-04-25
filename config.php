@@ -7,7 +7,7 @@ return array(
 'modelDir'=>'',
 
 'database' => array(
-    'connection' => 'mysqli://root:Shouke*liutie@localhost/btv',
+    'connection' => 'mysqli://user:password@localhost/test_db',
     'initialization' => array(
         'SET character_set_connection=utf8, character_set_results=utf8, character_set_client=binary',
         'SET sql_mode=``'
@@ -22,22 +22,6 @@ return array(
     'apiBase' => ROOT_PATH.'/abstracts/apiBase.php',
     'apiController' => ROOT_PATH.'/abstracts/apiController.php'
 ),
-
-'config' => array(
-    'donate_url' => "http://www.brtv.com/xxx/:id",
-    'dream_url'  => "http://www.brtv.com/xxx",
-    'push_enabled' => 1
-),
-
-'uploadPath' => ROOT_PATH.'/upload_files',
-
-'btvApi' => array(
-    'url' => 'http://sns.brtn.cn/rest/%s?token=%s',
-    'token' => '123456'
-)
-
-
-
 
 
 );
