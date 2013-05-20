@@ -1,4 +1,5 @@
 <IfModule mod_rewrite.c>
+Options +FollowSymLinks
 RewriteEngine on
 
 # if a directory or a file exists, use it directly
