@@ -262,7 +262,7 @@ class Model extends Singleton
             $params = $sql;
             $sql = $this->getSql($sql);
         }
-        
+
         if ($pager) {
             $limit = $pager->setPage()->getLimit();
             $sql = "SELECT SQL_CALC_FOUND_ROWS * FROM `$table` $sql $limit";
@@ -275,7 +275,7 @@ class Model extends Singleton
         } else {
             $result = $this->db->getAll($sql);
         }
-        
+
         if (!$pager) {
             return $result;
         }
@@ -367,8 +367,7 @@ class Model extends Singleton
     {
         
     }
-    
-    
+
     protected function beforeDelete($old)
     {
         
