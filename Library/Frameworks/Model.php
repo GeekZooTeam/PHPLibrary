@@ -241,7 +241,12 @@ class Model extends Singleton
         $params = func_get_args();
         $sql = array_shift($params);
 
-        if (isset($params[0]) && is_object($params[0])) {
+        if (!$sql) {
+            $sql = '';
+        } elseif (is_object($sql)) {
+            $pager = $sql;
+            $sql = '';
+        } elseif (isset($params[0]) && is_object($params[0])) {
             $pager = array_shift($params);
         }
 

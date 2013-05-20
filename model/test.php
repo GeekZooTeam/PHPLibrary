@@ -21,7 +21,7 @@ class testModel extends Model
     function afterUpdate($new, $old)
     {
         // print_r($this->db);exit;
-        // print_r($new);
+         print_r($new);
         // print_r($old);
     }
 
