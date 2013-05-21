@@ -17,6 +17,11 @@ if (!ini_get('date.timezone')) {
     date_default_timezone_set('Asia/Chongqing');
 }
 
+if (isset($_GET['phpinfo'])) {
+    phpinfo();
+    exit;
+}
+
 if (version_compare(PHP_VERSION, '5.3.0', '<')) { // below 5.3
     $loader = include_once LIB_PATH . '/autoload.php';
 } else {
@@ -51,12 +56,15 @@ if (PHP_SAPI != 'cli') {
     }
 
     // auto check subdir
+    // SCRIPT_NAME
     $subDir = '';
-    if (isset($_SERVER['PHP_SELF']) && strpos($_SERVER['PHP_SELF'], 'index.php')) {
-        $subDir = dirname($_SERVER['PHP_SELF']);
-    } elseif (isset($_SERVER['DOCUMENT_ROOT']) && strpos($_SERVER['SCRIPT_FILENAME'], $_SERVER['DOCUMENT_ROOT']) === 0) {
+    if (isset($_SERVER['DOCUMENT_ROOT']) && strpos($_SERVER['SCRIPT_FILENAME'], $_SERVER['DOCUMENT_ROOT']) === 0) {
         $subDir = dirname(substr($_SERVER['SCRIPT_FILENAME'], strlen($_SERVER['DOCUMENT_ROOT'])));
+    } elseif (isset($_SERVER['PHP_SELF']) && strpos($_SERVER['PHP_SELF'], 'index.php')) {
+        $subDir = dirname($_SERVER['PHP_SELF']);
     }
+    $subDir == '.' && $subDir = '';
+
     $subDir = rtrim($subDir, '/');
 
     if (!defined('SITE_URL')) {
@@ -134,16 +142,24 @@ function stripslashes_recursive($array) {
     return $array;
 }
 
-/**
- * modelclass::getInstance() 别名
- *
- * @param $model name
- * @return Model Class
- */
-function _model($model) {
-    $class= $model . 'Model';
+function _model($name) {
+    static $models = array();
 
-    return $class::getInstance();
+    if (!isset($models[$name])) {
+        $file = ROOT_PATH."/model/$name.php";
+        $table_name = $name;
+
+        $class = 'Model';
+        
+        if (file_exists($file)) {
+            require_once $file;
+            $class = $name.'Model';
+        }
+        
+        $models[$name] = new $class();
+    }
+
+    return $models[$name];
 }
 
 /**
@@ -189,17 +205,22 @@ function getClienip() {
 
 function getValueByDefault($value, $default) {
     if (!is_array($value)) {
-
+        
         $whiteList = array();
         if (is_array($default)) {
             $whiteList = $default;
-            $default = $default[0];
+            $default = isset($default[0]) ? $default[0] : array();
         }
 
         if (is_string($default)) {
             $value = trim($value);
         } elseif (is_int($default)) {
             $value = intval($value);
+        } elseif (is_array($default)) {
+            if ($value == '') {
+                return $default;
+            }
+            $value = (array)$value;
         } else {
             $value = floatval($value);
         }
@@ -213,7 +234,9 @@ function getValueByDefault($value, $default) {
             isset($default[$key]) || $default[$key] = '';
             $value[$key] = getValueByDefault($value[$key], $default[$key]);
         }
-        $value = array_merge($value, array_diff_key($default, $value));
+        if (is_array($default)) {
+            $value = array_merge($value, array_diff_key($default, $value));
+        }
     }
 
     return $value;

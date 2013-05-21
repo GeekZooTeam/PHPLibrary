@@ -9,7 +9,7 @@
  *
  */
 
-class Model extends Singleton
+class Model
 {
     protected $db  = null;
 
@@ -21,7 +21,7 @@ class Model extends Singleton
 
     public function __construct()
     {
-        $dbConfig = Config::getInstance()->get('database');
+        $dbConfig = Config::get('database');
 
         $this->db = Database::connect($dbConfig['connection']);
         $this->db->setConfig('initialization', $dbConfig['initialization']);

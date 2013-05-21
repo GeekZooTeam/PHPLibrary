@@ -9,23 +9,61 @@
  *
  */
 
-class Config extends Singleton
+class Config
 {
     private static $array = array();
+    private static $init = false;
 
-    function __construct()
+    private static function init()
     {
-        if (file_exists(ROOT_PATH.'/config.php')) {
-            self::$array = require_once ROOT_PATH.'/config.php';
+        if (self::$init) {
+            return true;
         }
-        // todo 远程提取
+
+        $path = ROOT_PATH.'/config';
+        $iterator = new DirectoryIterator($path);
+        foreach ($iterator as $file) {
+            if ($file->isDot() || !$file->isFile()) {
+                continue;
+            }
+
+            $extension = pathinfo($file->getFilename(), PATHINFO_EXTENSION);
+
+            if ($extension != 'php') {
+                continue;
+            }
+
+            self::$array[$file->getBasename('.php')] = include $file->getPathname();
+        }
+
+        return self::$init = true;
     }
 
-    function get($key)
+    public static function get($name)
     {
-        return isset(self::$array[$key]) ? self::$array[$key] : null;
+        self::init();
+
+        $name = explode('.', $name);
+        
+        $array = isset(self::$array[$name[0]]) ? self::$array[$name[0]] : array();
+        
+        if (!isset($name[1])) {
+            return $array;
+        }
+
+        return isset($array[$name[1]]) ? $array[$name[1]] : null;
+    }
+
+    public static function set($name, $value)
+    {
+        self::init();
+
+        $name = explode('.', $name);
+        
+        if (!isset($name[1])) {
+            self::$array[$name[0]] = $value;
+        }
+
+        self::$array[$name[0]][$name[1]] = $value;
     }
 }
-
-
-?>
