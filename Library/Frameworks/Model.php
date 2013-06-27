@@ -19,7 +19,7 @@ class Model
 
     protected $pri = '';
 
-    public function __construct()
+    public function __construct($table = '')
     {
         $dbConfig = Config::get('database');
 
@@ -27,14 +27,19 @@ class Model
         $this->db->setConfig('initialization', $dbConfig['initialization']);
         $this->db->setConfig('tablePreFix', $dbConfig['tablePreFix']);
 
+        $this->table = $table;
+
         if (empty($this->table)) {
             $thisClass = get_class($this);
-            $this->table = '{{' . substr($thisClass, 0, -5) . '}}';
+            $this->table = substr($thisClass, 0, -5);
         }
 
+        $this->table = '{{'.$this->table.'}}';
+
         $keys = $this->db->getAll("DESCRIBE `$this->table`");
+
         foreach ($keys as $val) {
-            $this->field[] = $val['Field'];
+            $this->field[$val['Field']] = $val['Default'];
             if ($val['Key'] == 'PRI') {
                 $this->pri = $val['Field'];
             }
@@ -58,10 +63,8 @@ class Model
         $sql = array_shift($params);
 
         // 主键 id 特殊处理
-        if (!is_array($sql)) {
-            if (strlen(intval($sql)) == strlen($sql)) {
-                $sql = array($this->pri => $sql);
-            }
+        if (is_numeric($sql)) {
+            $sql = array($this->pri => $sql);
         }
 
         if (is_string($sql)) {
@@ -90,9 +93,12 @@ class Model
 
         $params = func_get_args();
         $sql = array_shift($params);
-
+        
         $sql = $this->beforeCreate($sql);
-
+        // beforeCreate 终止插入进行
+        if (!$sql) {
+            return false;
+        }
         $params = array_values($sql);
 
         $sql = "INSERT INTO `$table` (".implode(', ', array_keys($sql)).') VALUES ('.implode(', ', array_fill(0, count($sql), '?')) . ')';
@@ -121,11 +127,10 @@ class Model
         $sql = array_shift($params);
 
         // 主键 id 特殊处理
-        if (!is_array($sql)) {
-            if (strlen(intval($sql)) == strlen($sql)) {
-                $sql = array($this->pri => $sql);
-            }
+        if (is_numeric($sql)) {
+            $sql = array($this->pri => $sql);
         }
+
 
         if (is_string($sql)) {
 
@@ -165,7 +170,10 @@ class Model
 
         foreach ($result as $val) {
             $array = $this->beforeUpdate($array, $val);
-
+            // beforeUpdate 终止更新
+            if (!$sql) {
+                continue;
+            }
             if (isset($array[0])) {
                 $params = $array;
                 $set = array_shift($params);
@@ -182,7 +190,14 @@ class Model
 
             $sql = "UPDATE `$table` $set WHERE {$this->pri} = {$val[$this->pri]}";
             $this->db->exec($sql, $params);
-            $this->afterUpdate($array, $val);
+            // 获取最新的记录
+            $new = $this->read($val[$this->pri]);
+
+            if (empty($new)) {
+                throw new Exception("cant load data: id: {$val[$this->pri]}, table : {$table}");
+            }
+
+            $this->afterUpdate($new, $val);
         }
 
         return count($result);
@@ -196,11 +211,15 @@ class Model
         $sql = array_shift($params);
 
         // 主键 id 特殊处理
-        if (!is_array($sql)) {
-            if (strlen(intval($sql)) == strlen($sql)) {
-                $sql = array($this->pri => $sql);
-            }
+        if (is_numeric($sql)) {
+            $sql = array($this->pri => $sql);
         }
+
+        // if (!is_array($sql)) {
+        //     if (strlen(intval($sql)) == strlen($sql)) {
+        //         $sql = array($this->pri => $sql);
+        //     }
+        // }
 
         if (is_string($sql)) {
 
@@ -224,7 +243,10 @@ class Model
         }
         
         foreach ($result as $val) {
-            $this->beforeDelete($val);
+            // beforeDelete 终止删除
+            if ($this->beforeDelete($val) === false) {
+                continue;
+            }
             $sql = "DELETE FROM `$table` WHERE {$this->pri} = {$val[$this->pri]}";
             $this->db->exec($sql);
             $this->afterDelete($val);

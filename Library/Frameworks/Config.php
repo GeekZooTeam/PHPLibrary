@@ -12,39 +12,66 @@
 class Config
 {
     private static $array = array();
-    private static $init = false;
 
-    private static function init()
+    public static $db = null;
+
+    // private static function init()
+    // {
+    //     if (self::$init) {
+    //         return true;
+    //     }
+    // 
+    //     $path = ROOT_PATH.'/config';
+    //     $iterator = new DirectoryIterator($path);
+    //     foreach ($iterator as $file) {
+    //         if ($file->isDot() || !$file->isFile()) {
+    //             continue;
+    //         }
+    // 
+    //         $extension = pathinfo($file->getFilename(), PATHINFO_EXTENSION);
+    // 
+    //         if ($extension != 'php') {
+    //             continue;
+    //         }
+    // 
+    //         self::$array[$file->getBasename('.php')] = include $file->getPathname();
+    //     }
+    // 
+    //     return self::$init = true;
+    // }
+    private static function loadConfig($name)
     {
-        if (self::$init) {
+        if (isset(self::$array[$name])) {
             return true;
         }
 
-        $path = ROOT_PATH.'/config';
-        $iterator = new DirectoryIterator($path);
-        foreach ($iterator as $file) {
-            if ($file->isDot() || !$file->isFile()) {
-                continue;
-            }
+        $fileName = ROOT_PATH."/config/{$name}.php";
 
-            $extension = pathinfo($file->getFilename(), PATHINFO_EXTENSION);
-
-            if ($extension != 'php') {
-                continue;
-            }
-
-            self::$array[$file->getBasename('.php')] = include $file->getPathname();
+        if (file_exists($fileName)) {
+            self::$array[$name] = include $fileName;
         }
 
-        return self::$init = true;
+        if (self::$db !== null) {
+            $data = self::$db->getAll("SELECT * FROM {{config}}");
+
+            foreach ($data as $val) {
+                $config = isset(self::$array[$val['key']]) ? self::$array[$val['key']] : array();
+                $val['data'] = json_decode($val['data'], true);
+                if (is_array($val['data'])) {
+                    self::$array[$val['key']] = array_merge($config, $val['data']);
+                } else {
+                    self::$array[$val['key']] = $val['data'];
+                }
+            }
+        }
     }
 
     public static function get($name)
     {
-        self::init();
-
         $name = explode('.', $name);
-        
+
+        self::loadConfig($name[0]);
+
         $array = isset(self::$array[$name[0]]) ? self::$array[$name[0]] : array();
         
         if (!isset($name[1])) {
@@ -56,14 +83,23 @@ class Config
 
     public static function set($name, $value)
     {
-        self::init();
-
         $name = explode('.', $name);
-        
+
+        self::loadConfig($name[0]);
+
         if (!isset($name[1])) {
             self::$array[$name[0]] = $value;
+        } else {
+            if (!is_array(self::$array[$name[0]])) {
+                self::$array[$name[0]] = array();
+            }
+            self::$array[$name[0]][$name[1]] = $value;
         }
 
-        self::$array[$name[0]][$name[1]] = $value;
+        if (self::$db !== null) {
+            $data = json_encode(self::$array[$name[0]]);
+            $sql = "INSERT INTO {{config}} VALUES(?, ?) ON DUPLICATE KEY UPDATE data = ?";
+            self::$db->exec($sql, $name[0], $data, $data);
+        }
     }
 }

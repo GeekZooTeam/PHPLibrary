@@ -77,7 +77,7 @@ if (PHP_SAPI != 'cli') {
                 $site_url .= ':' . $_SERVER['SERVER_PORT'];
             }
         }
-        $subDir && $site_url .= $subDir;
+        $subDir && $site_url = $site_url . '/' . $subDir;
 
         define('SITE_URL', $site_url);
     }
@@ -150,13 +150,16 @@ function _model($name) {
         $table_name = $name;
 
         $class = 'Model';
-        
+        $table = '';
+
         if (file_exists($file)) {
             require_once $file;
             $class = $name.'Model';
+        } else {
+            $table = $name;
         }
-        
-        $models[$name] = new $class();
+
+        $models[$name] = new $class($table);
     }
 
     return $models[$name];
@@ -205,11 +208,12 @@ function getClienip() {
 
 function getValueByDefault($value, $default) {
     if (!is_array($value)) {
-        
         $whiteList = array();
         if (is_array($default)) {
             $whiteList = $default;
-            $default = isset($default[0]) ? $default[0] : array();
+            $default = isset($default[0]) ? $default[0] : $default;
+        } elseif ($value == '') {
+            return $default;
         }
 
         if (is_string($default)) {
@@ -231,11 +235,11 @@ function getValueByDefault($value, $default) {
 
     } else {
         foreach ($value as $key => $val) {
-            isset($default[$key]) || $default[$key] = '';
-            $value[$key] = getValueByDefault($value[$key], $default[$key]);
+            $t = isset($default[$key]) ? $default[$key] : '';
+            $value[$key] = getValueByDefault($value[$key], $t);
         }
         if (is_array($default)) {
-            $value = array_merge($value, array_diff_key($default, $value));
+            $value += $default;
         }
     }
 
